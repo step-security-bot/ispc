@@ -341,6 +341,13 @@ jobs:
         name: fail_db.llvm14.${{matrix.target}}.txt
         path: fail_db.txt
 
+    - name: Upload full tests results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: results.llvm14.${{matrix.target}}
+        path: alloy_results*
+
   linux-test-llvm15:
     needs: [define-flow, linux-build-ispc-llvm15]
     runs-on: ubuntu-latest
@@ -380,6 +387,13 @@ jobs:
       with:
         name: fail_db.llvm15.${{matrix.target}}.txt
         path: fail_db.txt
+
+    - name: Upload full tests results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: results.llvm15.${{matrix.target}}
+        path: alloy_results*
 
   linux-test-llvm16:
     needs: [define-flow, linux-build-ispc-llvm16]
@@ -421,6 +435,13 @@ jobs:
         name: fail_db.llvm16.${{matrix.target}}.txt
         path: fail_db.txt
 
+    - name: Upload full tests results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: results.llvm16.${{matrix.target}}
+        path: alloy_results*
+
   # Test release version
   linux-test-llvm16-release:
     needs: [define-flow, linux-build-ispc-llvm16-release]
@@ -459,6 +480,13 @@ jobs:
       with:
         name: fail_db.llvm16rel.${{matrix.target}}.txt
         path: fail_db.txt
+
+    - name: Upload full tests results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: results.llvm16.${{matrix.target}}
+        path: alloy_results*
 
   # Debug run is experimental with the purpose to see if it's capable to catch anything.
   # So it's running in "full" mode only for now.
@@ -502,6 +530,13 @@ jobs:
         name: fail_db.llvm16.debug.txt
         path: fail_db.txt
 
+    - name: Upload full tests results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: results.llvm16.debug.${{matrix.target}}
+        path: alloy_results*
+
   linux-test-llvm17:
     needs: [define-flow, linux-build-ispc-llvm17]
     runs-on: ubuntu-latest
@@ -541,6 +576,13 @@ jobs:
       with:
         name: fail_db.llvm17.${{matrix.target}}.txt
         path: fail_db.txt
+
+    - name: Upload full tests results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: results.llvm17.${{matrix.target}}
+        path: alloy_results*
 
   # Test xe release version
   linux-test-xe-llvm16-release:
@@ -584,6 +626,13 @@ jobs:
       with:
         name: fail_db.xe.llvm16rel.${{matrix.target}}.txt
         path: fail_db.txt
+
+    - name: Upload full tests results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: results.llvm16-release.${{matrix.target}}
+        path: alloy_results*
 
   macos-build-ispc-llvm15:
     needs: [define-flow]
@@ -755,6 +804,13 @@ jobs:
         name: fail_db.llvm15.macos.sse4.txt
         path: fail_db.txt
 
+    - name: Upload full tests results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: results.llvm15.macos.sse4
+        path: alloy_results*
+
   macos-test-ispc-llvm16:
     needs: [define-flow, macos-build-ispc-llvm16]
     runs-on: macos-12
@@ -796,6 +852,13 @@ jobs:
         name: fail_db.llvm16.macos.sse4.txt
         path: fail_db.txt
 
+    - name: Upload full tests results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: results.llvm16.macos.sse4
+        path: alloy_results*
+
   macos-test-ispc-llvm17:
     needs: [define-flow, macos-build-ispc-llvm17]
     runs-on: macos-12
@@ -836,6 +899,13 @@ jobs:
       with:
         name: fail_db.llvm17.macos.sse4.txt
         path: fail_db.txt
+
+    - name: Upload full tests results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: results.llvm17.macos.sse4
+        path: alloy_results*
 
   win-build-ispc-llvm14:
     needs: [define-flow]
@@ -1108,6 +1178,13 @@ jobs:
         name: fail_db.llvm14.${{matrix.arch}}.${{matrix.target}}.txt
         path: fail_db.txt
 
+    - name: Upload full tests results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: results.llvm14.${{matrix.arch}}.${{matrix.target}}
+        path: alloy_results*
+
   win-test-llvm15:
     needs: [define-flow, win-build-ispc-llvm15]
     env:
@@ -1153,6 +1230,13 @@ jobs:
       with:
         name: fail_db.llvm15.${{matrix.arch}}.${{matrix.target}}.txt
         path: fail_db.txt
+
+    - name: Upload full tests results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: results.llvm15.${{matrix.arch}}.${{matrix.target}}
+        path: alloy_results*
 
   win-test-llvm16:
     needs: [define-flow, win-build-ispc-llvm16]
@@ -1200,6 +1284,13 @@ jobs:
         name: fail_db.llvm16.${{matrix.arch}}.${{matrix.target}}.txt
         path: fail_db.txt
 
+    - name: Upload full tests results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: results.llvm16.${{matrix.arch}}.${{matrix.target}}
+        path: alloy_results*
+
   win-test-llvm17:
     needs: [define-flow, win-build-ispc-llvm17]
     env:
@@ -1245,6 +1336,13 @@ jobs:
       with:
         name: fail_db.llvm17.${{matrix.arch}}.${{matrix.target}}.txt
         path: fail_db.txt
+
+    - name: Upload full tests results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: results.llvm17.${{matrix.arch}}.${{matrix.target}}
+        path: alloy_results*
 
   win-test-xe-llvm16-release:
     needs: [define-flow, win-build-ispc-xe-llvm16-release]
@@ -1292,6 +1390,13 @@ jobs:
       with:
         name: fail_db.xe.llvm16rel.${{matrix.arch}}.${{matrix.target}}.txt
         path: fail_db.txt
+
+    - name: Upload full tests results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: results.llvm16rel.${{matrix.arch}}.${{matrix.target}}
+        path: alloy_results*
 
   win-package-examples:
     needs: [define-flow]
