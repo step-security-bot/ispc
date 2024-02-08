@@ -72,6 +72,7 @@ RUN git clone https://github.com/$REPO.git ispc && \
         -B build \
         --preset os \
         -DLTO=$LTO \
+        -DPGO=$PGO \
         -DXE_DEPS=OFF \
         -DLLVM_VERSION="$LLVM_VERSION" \
         -DBUILD_STAGE1_TOOLCHAIN_ONLY=ON \
@@ -82,6 +83,8 @@ RUN git clone https://github.com/$REPO.git ispc && \
 
 FROM llvm_build_step1 AS llvm_build_step2
 SHELL ["/bin/bash", "-c"]
+ARG LTO=OFF
+ARG PGO=OFF
 ARG LLVM_VERSION
 ARG LLVM_DISABLE_ASSERTIONS
 
@@ -90,6 +93,7 @@ RUN cmake ispc/superbuild \
         -B build \
         --preset os \
         -DLTO=$LTO \
+        -DPGO=$PGO \
         -DXE_DEPS=OFF \
         -DLLVM_VERSION="$LLVM_VERSION" \
         -DBUILD_STAGE2_TOOLCHAIN_ONLY=ON \
@@ -103,6 +107,8 @@ ENV PATH=$LLVM_HOME/bin-$LLVM_VERSION/bin:$PATH
 
 FROM llvm_build_step2 AS ispc_build
 SHELL ["/bin/bash", "-c"]
+ARG LTO=OFF
+ARG PGO=OFF
 ARG LLVM_VERSION
 
 # Install regular ISPC dependencies
@@ -115,6 +121,7 @@ RUN cmake ispc/superbuild \
         -B build \
         --preset os \
         -DLTO=$LTO \
+        -DPGO=$PGO \
         -DXE_DEPS=OFF \
         -DCMAKE_CXX_FLAGS=-Werror \
         -DPREBUILT_STAGE2_PATH="$LLVM_HOME"/bin-"$LLVM_VERSION" \
