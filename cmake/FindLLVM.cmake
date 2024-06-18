@@ -61,7 +61,35 @@ function(str_to_list inStr outStr)
 endfunction()
 
 function(run_llvm_config output_var)
-    set(command "${LLVM_CONFIG_EXECUTABLE}" ${ARGN})
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+        set(HOST_ARCH "x86_64")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+        set(HOST_ARCH "aarch64")
+    else()
+        message(FATAL_ERROR "Unsupported host architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        set(HOST_OS "unknown-linux-gnu")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        set(HOST_OS "apple-darwin")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+        set(HOST_OS "pc-windows-msvc")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+        set(HOST_OS "unknown-freebsd")
+    else()
+        message(FATAL_ERROR "Unsupported host OS: ${CMAKE_SYSTEM_NAME}")
+    endif()
+
+    set(HOST_TRIPLE "${HOST_ARCH}-${HOST_OS}")
+
+    if (ISPC_USE_LLVM_LIBCXX)
+        set(command
+            "${CMAKE_COMMAND}" -E env "LD_LIBRARY_PATH=${LLVM_TOOLS_BINARY_DIR}/../lib/${HOST_TRIPLE}"
+            "${LLVM_CONFIG_EXECUTABLE}" ${ARGN})
+    else()
+        set(command "${LLVM_CONFIG_EXECUTABLE}" ${ARGN})
+    endif()
     execute_process(COMMAND ${command}
         RESULT_VARIABLE exit_code
         OUTPUT_VARIABLE ${output_var}

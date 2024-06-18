@@ -49,6 +49,7 @@ set(ISPC_SIGN_KEY "NO" CACHE STRING "Key to sign macOS or Windows build.")
 option(ISPC_INCLUDE_BENCHMARKS "Include ISPC benchmarks (ispc_benchmarks target)" OFF)
 option(ISPC_CROSS "Enable ISPC build with cross compilation support" ON)
 option(ISPC_PACKAGE_EXAMPLES "Package examples into the same archive with ISPC binaries" OFF)
+option(USE_LLVM_LIBCXX "Enable LLVM libc++ build and use it to build ISPC" OFF)
 option(LLVM_DISABLE_ASSERTIONS "Enable LLVM build without assertions" ON)
 option(LLVM_BUILD_OPENMP "Build OpenMP as part of LLVM" OFF)
 option(EXTERNAL_VERBOSE "Enable verbose for external project build and install commands" OFF)
@@ -186,6 +187,29 @@ if (APPLE)
     endif()
 endif()
 
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+    set(HOST_ARCH "x86_64")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    set(HOST_ARCH "aarch64")
+else()
+    message(FATAL_ERROR "Unsupported host architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(HOST_OS "unknown-linux-gnu")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(HOST_OS "apple-darwin")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(HOST_OS "pc-windows-msvc")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+    set(HOST_OS "unknown-freebsd")
+else()
+    message(FATAL_ERROR "Unsupported host OS: ${CMAKE_SYSTEM_NAME}")
+endif()
+
+set(HOST_TRIPLE "${HOST_ARCH}-${HOST_OS}")
+message(STATUS "Host target triple: ${HOST_TRIPLE}")
+
 
 string(APPEND LIT_TOOLS_DIR ${GNUWIN32} "/bin")
 
@@ -291,6 +315,7 @@ endif()
 message(STATUS "ISPC_INCLUDE_BENCHMARKS is ${ISPC_INCLUDE_BENCHMARKS}")
 message(STATUS "ISPC_CROSS is ${ISPC_CROSS}")
 message(STATUS "ISPC_PACKAGE_EXAMPLES is ${ISPC_PACKAGE_EXAMPLES}")
+message(STATUS "USE_LLVM_LIBCXX is ${USE_LLVM_LIBCXX}")
 message(STATUS "LLVM_DISABLE_ASSERTIONS is ${LLVM_DISABLE_ASSERTIONS}")
 message(STATUS "LLVM_BUILD_OPENMP is ${LLVM_BUILD_OPENMP}")
 message(STATUS "LTO is ${LTO}")
@@ -591,6 +616,11 @@ if (APPLE AND CMAKE_SYSTEM_VERSION VERSION_GREATER_EQUAL 13)
         ${LLVM_RUNTIMES}$<SEMICOLON>libcxx$<SEMICOLON>libcxxabi
         )
 endif()
+if (UNIX AND USE_LLVM_LIBCXX)
+    set(LLVM_RUNTIMES
+        ${LLVM_RUNTIMES}$<SEMICOLON>libcxx$<SEMICOLON>libcxxabi$<SEMICOLON>libunwind
+        )
+endif()
 
 # LLVM_ENABLE_RUNTIMES is a proper place for compiler-rt and openmp not LLVM_ENABLE_PROJECTS.
 list(APPEND LLVM_COMMON_CMAKE_ARGS
@@ -705,6 +735,11 @@ list(APPEND ISPC_COMMON_CMAKE_ARGS
 if (ISPC_CROSS)
     list(APPEND ISPC_COMMON_CMAKE_ARGS
         -DISPC_CROSS=ON
+        )
+endif()
+if (USE_LLVM_LIBCXX)
+    list(APPEND ISPC_COMMON_CMAKE_ARGS
+        -DISPC_USE_LLVM_LIBCXX=ON
         )
 endif()
 if (XE_DEPS)
@@ -906,6 +941,16 @@ gen_env_path(ENV_PATH_STAGE3 ENV_PATH_STAGE3_ESC_SEM "${CMAKE_BINARY_DIR}/stage3
 message(STATUS "ENV_PATH_STAGE2 is ${ENV_PATH_STAGE2}")
 message(STATUS "ENV_PATH_STAGE3 is ${ENV_PATH_STAGE3}")
 
+set(ENV_LD_LIBRARY_PATH2 "${STAGE2_PATH}/lib/${HOST_TRIPLE}")
+set(ENV_LD_LIBRARY_PATH3 "${CMAKE_BINARY_DIR}/stage3/lib/${HOST_TRIPLE}")
+message(STATUS "ENV_LD_LIBRARY_PATH2 is ${ENV_LD_LIBRARY_PATH2}")
+message(STATUS "ENV_LD_LIBRARY_PATH3 is ${ENV_LD_LIBRARY_PATH3}")
+
+set(CXX_STDLIB_FLAG "")
+if (UNIX AND USE_LLVM_LIBCXX)
+    set(CXX_STDLIB_FLAG "-stdlib=libc++")
+endif()
+
 
 # Generate toolchain files regardless current platform and configuration
 # because it is easier to check them.
@@ -957,7 +1002,7 @@ else()
     set(CMAKE_CXX_COMPILER clang++)
     set(CMAKE_LINKER       lld)
     set(CMAKE_C_FLAGS      "@CMAKE_C_FLAGS@")
-    set(CMAKE_CXX_FLAGS    "@CMAKE_CXX_FLAGS@")
+    set(CMAKE_CXX_FLAGS    "@CXX_STDLIB_FLAG@ @CMAKE_CXX_FLAGS@")
 endif()
 ]] @ONLY)
 
@@ -1001,7 +1046,7 @@ else()
     set(CMAKE_CXX_COMPILER clang++)
     set(CMAKE_LINKER       lld)
     set(CMAKE_C_FLAGS             "${COMMON_FLAGS} ${COMMON_C_FLAGS}")
-    set(CMAKE_CXX_FLAGS           "@CMAKE_CXX_FLAGS@ ${COMMON_FLAGS} ${COMMON_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS           "@CXX_STDLIB_FLAG@ @CMAKE_CXX_FLAGS@ ${COMMON_FLAGS} ${COMMON_C_FLAGS}")
     set(CMAKE_MODULE_LINKER_FLAGS "${COMMON_FLAGS} ${COMMON_LD_FLAGS}")
     set(CMAKE_SHARED_LINKER_FLAGS "${COMMON_FLAGS} ${COMMON_LD_FLAGS}")
     set(CMAKE_EXE_LINKER_FLAGS    "${COMMON_FLAGS} ${COMMON_LD_FLAGS}")
@@ -1045,7 +1090,7 @@ else()
     set(CMAKE_CXX_COMPILER clang++)
     set(CMAKE_LINKER       lld)
     set(CMAKE_C_FLAGS      "@CMAKE_C_FLAGS@")
-    set(CMAKE_CXX_FLAGS    "@CMAKE_CXX_FLAGS@")
+    set(CMAKE_CXX_FLAGS    "@CXX_STDLIB_FLAG@ @CMAKE_CXX_FLAGS@")
 endif()
 ]] @ONLY)
 
@@ -1193,6 +1238,11 @@ list(APPEND NINJA_COMMAND_WITH_ENV_STAGE2
     env
     "CCACHE_CONFIGPATH=${CCACHE_CLANG_V_CONF}"
     )
+if (UNIX AND USE_LLVM_LIBCXX)
+    list(APPEND NINJA_COMMAND_WITH_ENV_STAGE2
+        "LD_LIBRARY_PATH=${ENV_LD_LIBRARY_PATH2}"
+        )
+endif()
 # Workaround of Windows cmd related issue with cmd with too big PATH effectively doing nothing.
 if (EXPLICIT_ENV_PATH)
     list(APPEND NINJA_COMMAND_WITH_ENV_STAGE2
@@ -1210,6 +1260,11 @@ list(APPEND NINJA_COMMAND_WITH_ENV_STAGE3
     env
     "CCACHE_CONFIGPATH=${CCACHE_CLANG_V_CONF}"
     )
+if (UNIX AND USE_LLVM_LIBCXX)
+    list(APPEND NINJA_COMMAND_WITH_ENV_STAGE3
+        "LD_LIBRARY_PATH=${ENV_LD_LIBRARY_PATH3}"
+        )
+endif()
 if (EXPLICIT_ENV_PATH)
     list(APPEND NINJA_COMMAND_WITH_ENV_STAGE3
         "PATH=${ENV_PATH_STAGE3_ESC_SEM}"
