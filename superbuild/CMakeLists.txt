@@ -187,28 +187,11 @@ if (APPLE)
     endif()
 endif()
 
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
-    set(HOST_ARCH "x86_64")
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-    set(HOST_ARCH "aarch64")
-else()
-    message(FATAL_ERROR "Unsupported host architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+if (USE_LLVM_LIBCXX)
+    if (APPLE OR WIN32)
+        message(FATAL_ERROR "USE_LLVM_LIBCXX is supported now only for Linux")
+    endif()
 endif()
-
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(HOST_OS "unknown-linux-gnu")
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    set(HOST_OS "apple-darwin")
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    set(HOST_OS "pc-windows-msvc")
-elseif(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
-    set(HOST_OS "unknown-freebsd")
-else()
-    message(FATAL_ERROR "Unsupported host OS: ${CMAKE_SYSTEM_NAME}")
-endif()
-
-set(HOST_TRIPLE "${HOST_ARCH}-${HOST_OS}")
-message(STATUS "Host target triple: ${HOST_TRIPLE}")
 
 
 string(APPEND LIT_TOOLS_DIR ${GNUWIN32} "/bin")
@@ -616,7 +599,7 @@ if (APPLE AND CMAKE_SYSTEM_VERSION VERSION_GREATER_EQUAL 13)
         ${LLVM_RUNTIMES}$<SEMICOLON>libcxx$<SEMICOLON>libcxxabi
         )
 endif()
-if (UNIX AND USE_LLVM_LIBCXX)
+if (USE_LLVM_LIBCXX)
     set(LLVM_RUNTIMES
         ${LLVM_RUNTIMES}$<SEMICOLON>libcxx$<SEMICOLON>libcxxabi$<SEMICOLON>libunwind
         )
@@ -941,13 +924,35 @@ gen_env_path(ENV_PATH_STAGE3 ENV_PATH_STAGE3_ESC_SEM "${CMAKE_BINARY_DIR}/stage3
 message(STATUS "ENV_PATH_STAGE2 is ${ENV_PATH_STAGE2}")
 message(STATUS "ENV_PATH_STAGE3 is ${ENV_PATH_STAGE3}")
 
-set(ENV_LD_LIBRARY_PATH2 "${STAGE2_PATH}/lib/${HOST_TRIPLE}")
-set(ENV_LD_LIBRARY_PATH3 "${CMAKE_BINARY_DIR}/stage3/lib/${HOST_TRIPLE}")
-message(STATUS "ENV_LD_LIBRARY_PATH2 is ${ENV_LD_LIBRARY_PATH2}")
-message(STATUS "ENV_LD_LIBRARY_PATH3 is ${ENV_LD_LIBRARY_PATH3}")
+
+if (USE_LLVM_LIBCXX)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+        set(HOST_ARCH "x86_64")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+        set(HOST_ARCH "aarch64")
+    else()
+        message(FATAL_ERROR "Unsupported host architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+    
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        set(HOST_OS "unknown-linux-gnu")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+        set(HOST_OS "unknown-freebsd")
+    else()
+        message(FATAL_ERROR "Unsupported host OS: ${CMAKE_SYSTEM_NAME}")
+    endif()
+
+    set(HOST_TRIPLE "${HOST_ARCH}-${HOST_OS}")
+    message(STATUS "Host target triple: ${HOST_TRIPLE}")
+
+    set(ENV_LD_LIBRARY_PATH2 "${STAGE2_PATH}/lib/${HOST_TRIPLE}")
+    set(ENV_LD_LIBRARY_PATH3 "${CMAKE_BINARY_DIR}/stage3/lib/${HOST_TRIPLE}")
+    message(STATUS "ENV_LD_LIBRARY_PATH2 is ${ENV_LD_LIBRARY_PATH2}")
+    message(STATUS "ENV_LD_LIBRARY_PATH3 is ${ENV_LD_LIBRARY_PATH3}")
+endif()
 
 set(CXX_STDLIB_FLAG "")
-if (UNIX AND USE_LLVM_LIBCXX)
+if (USE_LLVM_LIBCXX)
     set(CXX_STDLIB_FLAG "-stdlib=libc++")
 endif()
 
@@ -1238,7 +1243,7 @@ list(APPEND NINJA_COMMAND_WITH_ENV_STAGE2
     env
     "CCACHE_CONFIGPATH=${CCACHE_CLANG_V_CONF}"
     )
-if (UNIX AND USE_LLVM_LIBCXX)
+if (USE_LLVM_LIBCXX)
     list(APPEND NINJA_COMMAND_WITH_ENV_STAGE2
         "LD_LIBRARY_PATH=${ENV_LD_LIBRARY_PATH2}"
         )
@@ -1260,7 +1265,7 @@ list(APPEND NINJA_COMMAND_WITH_ENV_STAGE3
     env
     "CCACHE_CONFIGPATH=${CCACHE_CLANG_V_CONF}"
     )
-if (UNIX AND USE_LLVM_LIBCXX)
+if (USE_LLVM_LIBCXX)
     list(APPEND NINJA_COMMAND_WITH_ENV_STAGE3
         "LD_LIBRARY_PATH=${ENV_LD_LIBRARY_PATH3}"
         )
