@@ -543,9 +543,15 @@ if (APPLE)
             )
     endif()
 else()
-    list(APPEND LLVM_COMMON_CMAKE_ARGS
-        -DCOMPILER_RT_BUILD_BUILTINS=OFF
-        )
+    if (HOST_ARCH STREQUAL "aarch64")
+        list(APPEND LLVM_COMMON_CMAKE_ARGS
+            -DCOMPILER_RT_BUILD_BUILTINS=ON
+            )
+    else()
+        list(APPEND LLVM_COMMON_CMAKE_ARGS
+            -DCOMPILER_RT_BUILD_BUILTINS=OFF
+            )
+    endif()
 endif()
 
 # Enable or disable assertions.
@@ -620,6 +626,7 @@ if (APPLE AND CMAKE_SYSTEM_VERSION VERSION_GREATER_EQUAL 13)
         ${LLVM_RUNTIMES}$<SEMICOLON>libcxx$<SEMICOLON>libcxxabi
         )
 endif()
+
 if (USE_LLVM_LIBCXX)
     set(LLVM_RUNTIMES
         ${LLVM_RUNTIMES}$<SEMICOLON>libcxx$<SEMICOLON>libcxxabi$<SEMICOLON>libunwind
@@ -630,6 +637,14 @@ endif()
 list(APPEND LLVM_COMMON_CMAKE_ARGS
     -DLLVM_ENABLE_RUNTIMES=${LLVM_RUNTIMES}
     )
+
+if (USE_LLVM_LIBCXX)
+    list(APPEND LLVM_COMMON_CMAKE_ARGS
+        -DLIBCXX_USE_COMPILER_RT=ON
+        -DLIBCXXABI_USE_COMPILER_RT=ON
+        -DLIBCXXABI_USE_LLVM_UNWINDER=ON
+        )
+endif()
 
 # stage1 specific LLVM cmake arguments.
 list(APPEND LLVM_STAGE1_CMAKE_ARGS
@@ -961,7 +976,7 @@ endif()
 
 set(CXX_STDLIB_FLAG "")
 if (USE_LLVM_LIBCXX)
-    set(CXX_STDLIB_FLAG "-stdlib=libc++")
+    set(CXX_STDLIB_FLAG "--start-no-unused-arguments -rtlib=compiler-rt -stdlib=libc++ --end-no-unused-arguments")
 endif()
 
 
