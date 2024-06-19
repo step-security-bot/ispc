@@ -44,6 +44,8 @@ set(BUILD_TYPE_LLVM "Release" CACHE STRING "Set the build type for LLVM build")
 set(BUILD_TYPE_SPIRV_TRANSLATOR "Release" CACHE STRING "Set the build type for SPIR-V Translator build")
 set(BUILD_TYPE_VC_INTRINSICS "Release" CACHE STRING "Set the build type for VC Intrinsics build")
 set(BUILD_TYPE_L0 "Release" CACHE STRING "Set the build type for L0 build")
+set(GCC_VERSION "7.4.0" CACHE STRING "Set version of libstdc++ (corresponds to GCC version). Used only when BUILD_GCC is ON")
+set(GCC_URL "NO" CACHE STRING "GCC url")
 set(ISPC_ANDROID_NDK_PATH "NO" CACHE STRING "Path to Android NDK. It is needed to ISPC_CROSS=ON on macOS.")
 set(ISPC_SIGN_KEY "NO" CACHE STRING "Key to sign macOS or Windows build.")
 option(ISPC_INCLUDE_BENCHMARKS "Include ISPC benchmarks (ispc_benchmarks target)" OFF)
@@ -63,6 +65,7 @@ option(BUILD_STAGE2_TOOLCHAIN_ONLY "Enable build of stage2 toolchain only, i.e.,
 option(BUILD_SPIRV_TRANSLATOR_ONLY "Enable only build of SPIRV-LLVM-Translator" OFF)
 option(BUILD_VC_INTRINSICS_ONLY "Enable only build of vc-intrinsics" OFF)
 option(BUILD_L0_LOADER_ONLY "Enable only build of level-zero loader" OFF)
+option(BUILD_GCC "Enable build of libstdc++ that is used to build stage2 and installed into its toolchain dir" OFF)
 option(BUILD_XE_DEPS_ONLY "Enable only build of all XE dependencies (L0 loader, vc-intrinsics, SPIRV-LLVM-Translator" OFF)
 option(INSTALL_TOOLCHAIN "Enable installation of toolchain to CMAKE_INSTALL_PREFIX" OFF)
 option(INSTALL_ISPC "Enable installation of ISPC to CMAKE_INSTALL_PREFIX" OFF)
@@ -164,6 +167,14 @@ if (BUILD_VC_INTRINSICS_ONLY)
 endif()
 if (BUILD_L0_LOADER_ONLY)
     set(BUILD_L0_LOADER_STANDALONE ON)
+endif()
+
+if (BUILD_GCC AND USE_LLVM_LIBCXX)
+    message(FATAL_ERROR "Superbuild can't use both libstdc++ and libc++ together")
+endif()
+
+if (BUILD_GCC AND (WIN32 OR APPLE))
+    message(FATAL_ERROR "Build with libstdc++ is supported on Linux only")
 endif()
 
 if (APPLE)
@@ -327,6 +338,7 @@ message(STATUS "BUILD_TYPE_LLVM is ${BUILD_TYPE_LLVM}")
 message(STATUS "BUILD_TYPE_SPIRV_TRANSLATOR is ${BUILD_TYPE_SPIRV_TRANSLATOR}")
 message(STATUS "BUILD_TYPE_VC_INTRINSICS is ${BUILD_TYPE_VC_INTRINSICS}")
 message(STATUS "BUILD_TYPE_L0 is ${BUILD_TYPE_L0}")
+message(STATUS "GCC_VERSION is ${GCC_VERSION}")
 message(STATUS "BUILD_STAGE2_TOOLCHAIN_ONLY is ${BUILD_STAGE2_TOOLCHAIN_ONLY}")
 message(STATUS "BUILD_SPIRV_TRANSLATOR_ONLY is ${BUILD_SPIRV_TRANSLATOR_ONLY}")
 message(STATUS "BUILD_VC_INTRINSICS_ONLY is ${BUILD_VC_INTRINSICS_ONLY}")
@@ -334,6 +346,7 @@ message(STATUS "BUILD_L0_LOADER_ONLY is ${BUILD_L0_LOADER_ONLY}")
 message(STATUS "BUILD_SPIRV_STANDALONE is ${BUILD_SPIRV_STANDALONE}")
 message(STATUS "BUILD_VC_INTRINSICS_STANDALONE is ${BUILD_VC_INTRINSICS_STANDALONE}")
 message(STATUS "BUILD_L0_LOADER_STANDALONE is ${BUILD_L0_LOADER_STANDALONE}")
+message(STATUS "BUILD_GCC is ${BUILD_GCC}")
 message(STATUS "BUILD_XE_DEPS_ONLY is ${BUILD_XE_DEPS_ONLY}")
 message(STATUS "INSTALL_TOOLCHAIN is ${INSTALL_TOOLCHAIN}")
 message(STATUS "INSTALL_ISPC is ${INSTALL_ISPC}")
@@ -518,6 +531,12 @@ list(APPEND LLVM_COMMON_CMAKE_ARGS
     -DCOMPILER_RT_BUILD_ORC=OFF
     -DCOMPILER_RT_BUILD_GWP_ASAN=OFF
     )
+
+if (BUILD_GCC)
+    list(APPEND LLVM_COMMON_CMAKE_ARGS
+        -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib:\$ORIGIN/../lib64
+        )
+endif()
 
 if (APPLE)
     # On macOS, we need builtins also.
@@ -958,6 +977,7 @@ endif()
 file(CONFIGURE OUTPUT stage1-toolchain.cmake CONTENT [[
 @CCACHE_LAUNCHER_ACTION@(CMAKE_C_COMPILER_LAUNCHER @CCACHE_EXE@)
 @CCACHE_LAUNCHER_ACTION@(CMAKE_CXX_COMPILER_LAUNCHER @CCACHE_EXE@)
+set(ENV{PATH}       "@ENV_PATH_STAGE2@")
 set(CMAKE_C_FLAGS   "@CMAKE_C_FLAGS@")
 set(CMAKE_CXX_FLAGS "@CMAKE_CXX_FLAGS@")
 if (WIN32)
@@ -1220,6 +1240,18 @@ if (NOT SKIP_FETCHING_XE_DEPS)
     endif()
 endif()
 
+if (BUILD_GCC)
+    # Download GCC source tarball
+    if (GCC_URL STREQUAL "NO")
+        set(GCC_URL "https://ftp.gnu.org/gnu/gcc/gcc-${GCC_VERSION}/gcc-${GCC_VERSION}.tar.gz")
+    endif()
+    FetchContent_Populate(gcc
+        QUIET
+        URL ${GCC_URL}
+        SOURCE_DIR gcc
+    )
+endif()
+
 
 # Run build and install commands in required environment.
 # It is needed to find ccache.conf files and to properly locate all needed tools during build.
@@ -1379,7 +1411,28 @@ if (PGO OR NOT SKIP_STAGE2)
     list(APPEND LLVM_STAGE2_DEPS)
 
     if (NOT SKIP_STAGE1)
+
+        set(STAGE0_DEPS "")
+        if (BUILD_GCC)
+            set(STAGE0_DEPS gcc)
+            ExternalProject_Add(gcc
+                DOWNLOAD_EXTRACT_TIMESTAMP OFF
+                UPDATE_COMMAND ""
+                BUILD_IN_SOURCE OFF
+                PREFIX bstdcxx
+                STAMP_DIR bstdcxx/s
+                BINARY_DIR bstdcxx/b
+                TMP_DIR bstdcxx/t
+                INSTALL_DIR ${TOOLCHAIN_STAGE1_INSTALL_PREFIX}
+                SOURCE_DIR gcc
+                CONFIGURE_COMMAND cd ../../gcc && ./contrib/download_prerequisites && cd - && ../../gcc/configure --enable-languages=c,c++ --disable-multilib --libdir=${TOOLCHAIN_STAGE1_INSTALL_PREFIX}/lib --prefix=${TOOLCHAIN_STAGE1_INSTALL_PREFIX}
+                BUILD_COMMAND make -j ${CMAKE_BUILD_PARALLEL_LEVEL}
+                INSTALL_COMMAND make install
+                )
+        endif()
+
         ExternalProject_Add(stage1
+            DEPENDS ${STAGE0_DEPS}
             DOWNLOAD_COMMAND ""
             UPDATE_COMMAND ""
             SOURCE_DIR llvm-source
