@@ -443,6 +443,27 @@ hash_dir = false
 endif()
 
 
+if (USE_LLVM_LIBCXX)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+        set(HOST_ARCH "x86_64")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+        set(HOST_ARCH "aarch64")
+    else()
+        message(FATAL_ERROR "Unsupported host architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        set(HOST_OS "unknown-linux-gnu")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+        set(HOST_OS "unknown-freebsd")
+    else()
+        message(FATAL_ERROR "Unsupported host OS: ${CMAKE_SYSTEM_NAME}")
+    endif()
+
+    set(HOST_TRIPLE "${HOST_ARCH}-${HOST_OS}")
+    message(STATUS "Host target triple: ${HOST_TRIPLE}")
+endif()
+
 if (APPLE)
     message(STATUS "APPLE CMAKE_SYSTEM_VERSION is ${CMAKE_SYSTEM_VERSION}")
     # Starting from MacOS 10.9 Maverics which is Darwin 13.0, C and C++ library
@@ -665,6 +686,12 @@ if (XE_DEPS)
         -DLLVM_EXTERNAL_PROJECTS=vc-intrinsics$<SEMICOLON>SPIRV-LLVM-Translator
         -DLLVM_EXTERNAL_VC_INTRINSICS_SOURCE_DIR=${CMAKE_BINARY_DIR}/vc-intrinsics
         -DLLVM_EXTERNAL_SPIRV_LLVM_TRANSLATOR_SOURCE_DIR=${CMAKE_BINARY_DIR}/spirv-translator
+        )
+endif()
+
+if (USE_LLVM_LIBCXX)
+    list(APPEND LLVM_STAGE2_COMMON_CMAKE_ARGS
+        -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib:\$ORIGIN/../lib/${HOST_TRIPLE}
         )
 endif()
 
@@ -926,25 +953,6 @@ message(STATUS "ENV_PATH_STAGE3 is ${ENV_PATH_STAGE3}")
 
 
 if (USE_LLVM_LIBCXX)
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
-        set(HOST_ARCH "x86_64")
-    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-        set(HOST_ARCH "aarch64")
-    else()
-        message(FATAL_ERROR "Unsupported host architecture: ${CMAKE_SYSTEM_PROCESSOR}")
-    endif()
-    
-    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        set(HOST_OS "unknown-linux-gnu")
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
-        set(HOST_OS "unknown-freebsd")
-    else()
-        message(FATAL_ERROR "Unsupported host OS: ${CMAKE_SYSTEM_NAME}")
-    endif()
-
-    set(HOST_TRIPLE "${HOST_ARCH}-${HOST_OS}")
-    message(STATUS "Host target triple: ${HOST_TRIPLE}")
-
     set(ENV_LD_LIBRARY_PATH2 "${STAGE2_PATH}/lib/${HOST_TRIPLE}")
     set(ENV_LD_LIBRARY_PATH3 "${CMAKE_BINARY_DIR}/stage3/lib/${HOST_TRIPLE}")
     message(STATUS "ENV_LD_LIBRARY_PATH2 is ${ENV_LD_LIBRARY_PATH2}")
