@@ -76,7 +76,7 @@ RUN git clone https://github.com/$REPO.git ispc && \
         -DLLVM_VERSION="$LLVM_VERSION" \
         -DBUILD_STAGE2_TOOLCHAIN_ONLY=ON \
         -DCMAKE_INSTALL_PREFIX="$LLVM_HOME"/bin-"$LLVM_VERSION" \
-        -DUSE_LLVM_LIBCXX=ON \
+        -DBUILD_GCC=ON \
         -DLLVM_DISABLE_ASSERTIONS="$LLVM_DISABLE_ASSERTIONS" && \
     cmake --build build && \
     rm -rf build
@@ -103,7 +103,6 @@ RUN cmake ispc/superbuild \
         -DXE_DEPS=OFF \
         -DCMAKE_CXX_FLAGS=-Werror \
         -DPREBUILT_STAGE2_PATH="$LLVM_HOME"/bin-"$LLVM_VERSION" \
-        -DUSE_LLVM_LIBCXX=ON \
         -DCMAKE_INSTALL_PREFIX=/usr/local/src/ispc/bin-"$LLVM_VERSION" && \
     cmake --build build && \
     cmake --build build --target ispc-stage2-check-all && \
